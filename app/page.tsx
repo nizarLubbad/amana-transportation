@@ -680,12 +680,34 @@ const getPriorityColor = (priority: Incident["priority"]) => {
   }
 };
 
+// --- NEW Component: ProgressBar ---
+const ProgressBar: React.FC<{ percentage: number }> = ({ percentage }) => {
+  let barColor = "bg-emerald-500"; // Green for good utilization
+
+  if (percentage >= 90) {
+    barColor = "bg-red-500"; // Red for near capacity/overcrowded
+  } else if (percentage >= 75) {
+    barColor = "bg-amber-500"; // Amber for high utilization
+  }
+
+  return (
+    <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full mt-1 overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+        style={{ width: `${percentage > 100 ? 100 : percentage}%` }}
+      ></div>
+    </div>
+  );
+};
+
+// --- MODIFIED Component: Card (Added support for progress bar) ---
 const Card: React.FC<{
   title: string;
   value: string | number;
   description: string;
   icon: React.ReactNode;
-}> = ({ title, value, description, icon }) => (
+  progressBar?: number;
+}> = ({ title, value, description, icon, progressBar }) => (
   <div className="flex flex-col rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800">
     <div className="flex items-center justify-between">
       <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
@@ -694,6 +716,8 @@ const Card: React.FC<{
       {icon}
     </div>
     <p className="mt-1 text-3xl font-semibold text-foreground">{value}</p>
+    {progressBar !== undefined && <ProgressBar percentage={progressBar} />}{" "}
+    {/* Conditional Progress Bar */}
     <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
       {description}
     </p>
@@ -922,21 +946,13 @@ export default function Dashboard() {
             description={`Total capacity: ${operational_summary.total_capacity}`}
             icon={<span className="text-xl">🧑‍🤝‍🧑</span>}
           />
+          {/* 🛑 Key Change: Passing the percentage to the new 'progressBar' prop */}
           <Card
             title="Avg. Utilization"
             value={`${operational_summary.average_utilization}%`}
             description={`System-wide passenger load.`}
-            icon={
-              <span
-                className={`text-xl ${
-                  operational_summary.average_utilization > 70
-                    ? "text-red-500"
-                    : "text-zinc-500"
-                }`}
-              >
-                📈
-              </span>
-            }
+            icon={<span className="text-xl">📈</span>}
+            progressBar={operational_summary.average_utilization} // New Prop
           />
         </div>
         {criticalIncidents > 0 && (
