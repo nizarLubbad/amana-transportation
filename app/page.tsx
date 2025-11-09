@@ -1,5 +1,10 @@
 "use client";
-import { useState } from "react"; // We need this hook for the accordion functionality
+
+import { useMemo, useState } from "react"; // We need this hook for the accordion functionality
+
+// 🛑 NEW IMPORTS for the map feature
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet"; // Used for custom marker icons
 
 // --- Type Definitions ---
 type Incident = {
@@ -900,6 +905,115 @@ const BusLineRow: React.FC<{ line: BusLine }> = ({ line }) => {
   );
 };
 
+// --- NEW Component: BusMap (Bus Tracking Map) ---
+const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
+  // Center map near Kuala Lumpur, Malaysia (the implied location)
+  const position: [number, number] = [3.139, 101.6869];
+  const zoom = 11;
+
+  // Custom marker icons based on status
+  const createBusIcon = (color: string) => {
+    return new L.DivIcon({
+      className: "custom-bus-icon",
+      html: `<div style="background-color: ${color};" class="w-7 h-7 rounded-full flex items-center justify-center border-2 border-white dark:border-zinc-950 shadow-lg text-white font-bold text-xs">🚌</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -7],
+    });
+  };
+
+  const activeIcon = useMemo(() => createBusIcon("#10b981"), []); // Emerald-500
+  const maintenanceIcon = useMemo(() => createBusIcon("#f59e0b"), []); // Amber-500
+  const outOfServiceIcon = useMemo(() => createBusIcon("#ef4444"), []); // Red-500
+  const unknownIcon = useMemo(() => createBusIcon("#71717a"), []); // Zinc-500
+
+  const getBusIcon = (status: BusLine["status"]) => {
+    switch (status) {
+      case "Active":
+        return activeIcon;
+      case "Maintenance":
+        return maintenanceIcon;
+      case "Out of Service":
+        return outOfServiceIcon;
+      default:
+        return unknownIcon;
+    }
+  };
+
+  const activeBuses = busLines.filter(
+    (line) => line.status === "Active" || line.status === "Maintenance"
+  );
+
+  return (
+    // The map container must have a defined height
+    <div className="w-full h-[400px] rounded-lg shadow-xl overflow-hidden border border-zinc-200 dark:border-zinc-700">
+      <MapContainer
+        center={position}
+        zoom={zoom}
+        scrollWheelZoom={false}
+        className="w-full h-full z-0" // z-0 helps with any Tailwind stacking context issues
+      >
+        <TileLayer
+          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+
+        {activeBuses.map((line) => {
+          // Check for valid coordinates before rendering
+          if (
+            line.current_location &&
+            line.current_location.latitude &&
+            line.current_location.longitude
+          ) {
+            const position: L.LatLngExpression = [
+              line.current_location.latitude,
+              line.current_location.longitude,
+            ];
+            const icon = getBusIcon(line.status);
+
+            return (
+              <Marker key={line.id} position={position} icon={icon}>
+                <Popup>
+                  <div className="font-sans text-sm p-1">
+                    <h3 className="font-bold text-base mb-1">
+                      {line.route_number}: {line.name}
+                    </h3>
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      <span
+                        className={`font-semibold ${getStatusColor(
+                          line.status
+                        )} px-1 rounded`}
+                      >
+                        {line.status}
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Driver:</strong> {line.driver.name}
+                    </p>
+                    <p>
+                      <strong>Load:</strong> {line.passengers.current}/
+                      {line.passengers.capacity} (
+                      {line.passengers.utilization_percentage}%)
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Last updated:{" "}
+                      {new Date(
+                        line.current_location.timestamp
+                      ).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          }
+          return null;
+        })}
+      </MapContainer>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const { operational_summary, bus_lines, company_info } = amanaData;
   const criticalIncidents = bus_lines
@@ -921,6 +1035,14 @@ export default function Dashboard() {
           {company_info.description}
         </p>
       </header>
+
+      {/* 🛑 NEW: Interactive Map Section */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold mb-4 text-foreground">
+          Live Fleet Tracking Map
+        </h2>
+        <BusMap busLines={bus_lines} />
+      </section>
 
       {/* Operational Summary Cards */}
       <section className="mb-10">
