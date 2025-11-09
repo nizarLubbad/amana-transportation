@@ -997,10 +997,7 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
                       {line.passengers.utilization_percentage}%)
                     </p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      Last updated:{" "}
-                      {new Date(
-                        line.current_location.timestamp
-                      ).toLocaleTimeString()}
+                      Location: {line.current_location.address}
                     </p>
                   </div>
                 </Popup>
