@@ -1,22 +1,7 @@
-import Image from "next/image";
-// Using the imported SVGs as simple components (assuming they are set up for import,
-// but for this example, I'll use simple icons or Tailwind classes)
+"use client";
+import { useState } from "react"; // We need this hook for the accordion functionality
 
-// --- PASTE ALL THE TYPES AND THE 'amanaData' CONSTANT HERE ---
-// (As defined in step 1 above)
-
-// app/page.tsx (new content at the top)
-
-// --- Types for Amana Transportation Data ---
-type BusStop = {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  estimated_arrival: string;
-  is_next_stop: boolean;
-};
-
+// --- Type Definitions ---
 type Incident = {
   id: number;
   type: string;
@@ -24,7 +9,16 @@ type Incident = {
   reported_by: string;
   reported_time: string;
   status: string;
-  priority: "High" | "Medium" | "Low" | "Critical";
+  priority: "Critical" | "High" | "Medium" | "Low";
+};
+
+type BusStop = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  estimated_arrival: string;
+  is_next_stop: boolean;
 };
 
 type BusLine = {
@@ -65,26 +59,6 @@ type BusLine = {
   };
 };
 
-type OperationalSummary = {
-  total_buses: number;
-  active_buses: number;
-  maintenance_buses: number;
-  out_of_service_buses: number;
-  total_capacity: number;
-  current_passengers: number;
-  average_utilization: number;
-};
-
-type Filters = {
-  available_statuses: string[];
-  available_routes: string[];
-  applied: {
-    status: string | null;
-    busId: number | null;
-    routeNumber: string | null;
-  };
-};
-
 type AmanaData = {
   message: string;
   company_info: {
@@ -95,12 +69,29 @@ type AmanaData = {
     description: string;
   };
   bus_lines: BusLine[];
-  operational_summary: OperationalSummary;
-  filters: Filters;
+  operational_summary: {
+    total_buses: number;
+    active_buses: number;
+    maintenance_buses: number;
+    out_of_service_buses: number;
+    total_capacity: number;
+    current_passengers: number;
+    average_utilization: number;
+  };
+  filters: {
+    available_statuses: string[];
+    available_routes: string[];
+    applied: {
+      status: string | null;
+      busId: number | null;
+      routeNumber: string | null;
+    };
+  };
 };
 
-// --- Data Constant ---
-const amanaData: AmanaData = {
+// --- PASTE ALL THE TYPES AND THE 'amanaData' CONSTANT HERE ---
+// (The data block is omitted here for brevity, but it remains the same as previously defined)
+const amanaData = {
   message: "Amana Transportation bus data retrieved successfully",
   company_info: {
     name: "Amana Transportation",
@@ -657,25 +648,27 @@ const amanaData: AmanaData = {
       routeNumber: null,
     },
   },
-} as AmanaData; // Cast to use the type defined above
+} as AmanaData;
 
+// --- Helper Functions (Small adjustments for better theme contrast) ---
 const getStatusColor = (status: BusLine["status"]) => {
+  // Use generic color names for text, but more theme-aware backgrounds
   switch (status) {
     case "Active":
-      return "text-emerald-600 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-900/50";
+      return "text-emerald-500 bg-emerald-500/10";
     case "Maintenance":
-      return "text-amber-600 dark:text-amber-400 bg-amber-100/50 dark:bg-amber-900/50";
+      return "text-amber-500 bg-amber-500/10";
     case "Out of Service":
-      return "text-red-600 dark:text-red-400 bg-red-100/50 dark:bg-red-900/50";
+      return "text-red-500 bg-red-500/10";
     default:
-      return "text-zinc-600 dark:text-zinc-400 bg-zinc-100/50 dark:bg-zinc-900/50";
+      return "text-zinc-500 bg-zinc-500/10";
   }
 };
 
 const getPriorityColor = (priority: Incident["priority"]) => {
   switch (priority) {
     case "Critical":
-      return "text-red-600";
+      return "text-red-500";
     case "High":
       return "text-orange-500";
     case "Medium":
@@ -707,36 +700,38 @@ const Card: React.FC<{
   </div>
 );
 
+// --- MODIFIED Component: BusLineDetails ---
 const BusLineDetails: React.FC<{ line: BusLine }> = ({ line }) => (
-  <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-    <h3 className="text-lg font-semibold text-foreground">
-      Route Details ({line.route_number})
-    </h3>
-
-    {/* Two-Column Grid for Details */}
-    <div className="mt-3 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+  // Changed bg to a slightly deeper tone to separate it from the main row background
+  <div className="mt-2 p-4 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+    <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
       <div className="space-y-2">
+        <h4 className="font-bold text-base text-foreground mb-1">
+          Vehicle & Driver Info
+        </h4>
         <p>
           <strong>Driver:</strong> {line.driver.name} (ID: {line.driver.id})
+        </p>
+        <p>
+          <strong>Shift:</strong> {line.driver.shift_start} -{" "}
+          {line.driver.shift_end}
         </p>
         <p>
           <strong>Vehicle:</strong> {line.vehicle_info.model} (
           {line.vehicle_info.year})
         </p>
+        {/* Changed license plate background to a simple theme-friendly gray */}
         <p>
           <strong>License Plate:</strong>{" "}
-          <span className="font-mono text-xs inline-block bg-zinc-100 dark:bg-zinc-700 px-2 py-0.5 rounded">
+          <span className="font-mono text-xs inline-block bg-zinc-300 dark:bg-zinc-700 px-2 py-0.5 rounded text-foreground">
             {line.vehicle_info.license_plate}
           </span>
         </p>
-        <p>
-          <strong>Fuel Level:</strong> {line.vehicle_info.fuel_level}%
-        </p>
       </div>
       <div className="space-y-2">
-        <p>
-          <strong>Current Location:</strong> {line.current_location.address}
-        </p>
+        <h4 className="font-bold text-base text-foreground mb-1">
+          Route & Performance
+        </h4>
         <p>
           <strong>Total Distance:</strong> {line.route_info.total_distance} km
         </p>
@@ -744,22 +739,27 @@ const BusLineDetails: React.FC<{ line: BusLine }> = ({ line }) => (
           <strong>Avg. Speed:</strong> {line.route_info.average_speed} km/h
         </p>
         <p>
-          <strong>Next Stop:</strong>{" "}
-          {line.bus_stops.find((s) => s.is_next_stop)?.name || "N/A"}
+          <strong>Completion:</strong> {line.route_info.estimated_completion}
+        </p>
+        <p>
+          <strong>Last Maintenance:</strong>{" "}
+          {line.vehicle_info.last_maintenance}
         </p>
       </div>
     </div>
 
     {/* Incidents Table */}
     {line.incidents.length > 0 && (
-      <div className="mt-4">
-        <h4 className="font-semibold text-sm text-red-500 dark:text-red-400">
-          Incidents ({line.incidents.length})
+      <div className="mt-4 pt-4 border-t border-zinc-300 dark:border-zinc-700">
+        <h4 className="font-bold text-sm text-red-500 dark:text-red-400 mb-2">
+          Active Incidents (
+          {line.incidents.filter((i) => i.status !== "Resolved").length})
         </h4>
-        <div className="mt-2 border border-red-200 dark:border-red-700 rounded-lg overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-red-300 dark:border-red-900">
           <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-red-50 dark:bg-red-900/50">
+            {/* Changed header background to be less aggressive red */}
+            <thead className="bg-red-50 dark:bg-red-950">
+              <tr>
                 <th className="p-2 font-medium">Type</th>
                 <th className="p-2 font-medium">Description</th>
                 <th className="p-2 font-medium">Priority</th>
@@ -770,7 +770,7 @@ const BusLineDetails: React.FC<{ line: BusLine }> = ({ line }) => (
               {line.incidents.map((incident) => (
                 <tr
                   key={incident.id}
-                  className="border-t border-red-100 dark:border-red-800"
+                  className="border-t border-red-100 dark:border-red-900/50"
                 >
                   <td className="p-2">{incident.type}</td>
                   <td className="p-2">{incident.description}</td>
@@ -792,11 +792,100 @@ const BusLineDetails: React.FC<{ line: BusLine }> = ({ line }) => (
   </div>
 );
 
+const BusLineRow: React.FC<{ line: BusLine }> = ({ line }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasHighPriorityIncident = line.incidents.some(
+    (i) => ["Critical", "High"].includes(i.priority) && i.status !== "Resolved"
+  );
+
+  return (
+    <>
+      {/* Main Table Row */}
+      <tr
+        className={`cursor-pointer transition-colors 
+                    ${
+                      isExpanded
+                        ? "bg-zinc-100 dark:bg-zinc-800"
+                        : "bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    } 
+                    ${
+                      hasHighPriorityIncident ? "border-l-4 border-red-500" : ""
+                    }`}
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        {/* ... (tds remain the same) ... */}
+        <td className="px-6 py-4 whitespace-nowrap">
+          <p className="text-sm font-semibold text-foreground">
+            {line.route_number}
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            {line.name}
+          </p>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold leading-5 ${getStatusColor(
+              line.status
+            )}`}
+          >
+            {line.status}
+          </span>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+          {line.passengers.current} / {line.passengers.capacity}
+          <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+            ({line.passengers.utilization_percentage}%)
+          </span>
+        </td>
+        <td className="px-6 py-4 text-sm text-foreground">
+          {line.bus_stops.find((s) => s.is_next_stop)?.name || "N/A"}
+          <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+            (
+            {line.bus_stops.find((s) => s.is_next_stop)?.estimated_arrival ||
+              "N/A"}
+            )
+          </span>
+        </td>
+        <td className="px-6 py-4 text-right text-sm text-zinc-500 dark:text-zinc-400">
+          {hasHighPriorityIncident && (
+            <span className="text-red-500 mr-2 font-bold">⚠️</span>
+          )}
+          <span
+            className={`inline-block transform transition-transform ${
+              isExpanded ? "rotate-90" : "rotate-0"
+            }`}
+          >
+            &gt;
+          </span>
+        </td>
+      </tr>
+
+      {/* Expanded Content Row */}
+      {isExpanded && (
+        // Use a slightly darker gray for the expanded content row for contrast
+        <tr className="bg-zinc-50 dark:bg-zinc-900/75">
+          <td
+            colSpan={5}
+            className="p-0 border-t border-zinc-200 dark:border-zinc-700"
+          >
+            <BusLineDetails line={line} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
 export default function Dashboard() {
   const { operational_summary, bus_lines, company_info } = amanaData;
   const criticalIncidents = bus_lines
     .flatMap((line) => line.incidents)
     .filter((i) => i.priority === "Critical" && i.status !== "Resolved").length;
+
+  // Since we are using a client-side hook (useState) in BusLineRow, we need to make the parent component a Client Component.
+  // In Next.js App Router, this is typically done by adding 'use client' at the top, but since we are modifying only page.tsx,
+  // we'll assume the Next.js setup handles this for now, or you would add 'use client' at the top of this file.
+  // For the purpose of providing the improved code block, the structure below is correct.
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950 p-4 md:p-8">
@@ -862,7 +951,7 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Bus Line Status Table */}
+      {/* Bus Line Status Table (Now using BusLineRow component) */}
       <section>
         <h2 className="text-xl font-semibold mb-4 text-foreground">
           Bus Line Status ({bus_lines.length} Routes)
@@ -897,91 +986,23 @@ export default function Dashboard() {
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
+                  className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
                 >
-                  Location
+                  Details
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-700 dark:bg-zinc-900">
+            <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-900">
               {bus_lines.map((line) => (
-                <tr
-                  key={line.id}
-                  className="hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors group"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <p className="text-sm font-semibold text-foreground">
-                      {line.route_number}
-                    </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {line.name}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold leading-5 ${getStatusColor(
-                        line.status
-                      )}`}
-                    >
-                      {line.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                    {line.passengers.current} / {line.passengers.capacity}
-                    <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
-                      ({line.passengers.utilization_percentage}%)
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-foreground">
-                    {line.bus_stops.find((s) => s.is_next_stop)?.name || "N/A"}
-                    <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
-                      (
-                      {line.bus_stops.find((s) => s.is_next_stop)
-                        ?.estimated_arrival || "N/A"}
-                      )
-                    </span>
-                  </td>
-                  <td
-                    className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400 max-w-sm truncate"
-                    title={line.current_location.address}
-                  >
-                    {line.current_location.address}
-                  </td>
-                </tr>
+                // Using the new component instead of a raw <tr>
+                <BusLineRow key={line.id} line={line} />
               ))}
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* Detailed View - Can be shown on click, but for a simple dashboard, we can just list them */}
-      <section className="mt-10">
-        <h2 className="text-xl font-semibold mb-4 text-foreground">
-          Detailed Bus Information
-        </h2>
-        <div className="space-y-6">
-          {bus_lines.map((line) => (
-            <div
-              key={line.id}
-              className="p-6 rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800 shadow-lg"
-            >
-              <header className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold text-foreground">
-                  {line.name}
-                </h3>
-                <span
-                  className={`inline-flex rounded-full px-4 py-1.5 text-sm font-bold ${getStatusColor(
-                    line.status
-                  )}`}
-                >
-                  {line.status}
-                </span>
-              </header>
-              <BusLineDetails line={line} />
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Removed the redundant 'Detailed Bus Information' section at the bottom */}
     </div>
   );
 }
