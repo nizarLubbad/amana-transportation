@@ -6,6 +6,8 @@ import { useMemo, useState } from "react"; // We need this hook for the accordio
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet"; // Used for custom marker icons
 
+import dynamic from "next/dynamic";
+
 // --- Type Definitions ---
 type Incident = {
   id: number;
@@ -34,6 +36,7 @@ type BusLine = {
     latitude: number;
     longitude: number;
     address: string;
+    timestamp?: string;
   };
   status: "Active" | "Maintenance" | "Out of Service";
   passengers: {
@@ -922,10 +925,10 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
     });
   };
 
-  const activeIcon = useMemo(() => createBusIcon("#10b981"), []); // Emerald-500
-  const maintenanceIcon = useMemo(() => createBusIcon("#f59e0b"), []); // Amber-500
-  const outOfServiceIcon = useMemo(() => createBusIcon("#ef4444"), []); // Red-500
-  const unknownIcon = useMemo(() => createBusIcon("#71717a"), []); // Zinc-500
+  const activeIcon = useMemo(() => createBusIcon("#10b981"), []);
+  const maintenanceIcon = useMemo(() => createBusIcon("#f59e0b"), []);
+  const outOfServiceIcon = useMemo(() => createBusIcon("#ef4444"), []);
+  const unknownIcon = useMemo(() => createBusIcon("#71717a"), []);
 
   const getBusIcon = (status: BusLine["status"]) => {
     switch (status) {
@@ -945,13 +948,14 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
   );
 
   return (
-    // The map container must have a defined height
+    // Note: MapContainer needs to be imported here or from the dynamic import's component
     <div className="w-full h-[400px] rounded-lg shadow-xl overflow-hidden border border-zinc-200 dark:border-zinc-700">
+      {/* The MapContainer MUST be rendered *inside* the component that is dynamically loaded */}
       <MapContainer
         center={position}
         zoom={zoom}
         scrollWheelZoom={false}
-        className="w-full h-full z-0" // z-0 helps with any Tailwind stacking context issues
+        className="w-full h-full z-0"
       >
         <TileLayer
           attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
@@ -959,7 +963,6 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
         />
 
         {activeBuses.map((line) => {
-          // Check for valid coordinates before rendering
           if (
             line.current_location &&
             line.current_location.latitude &&
@@ -995,9 +998,14 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
                       <strong>Load:</strong> {line.passengers.current}/
                       {line.passengers.capacity} (
                       {line.passengers.utilization_percentage}%)
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Location: {line.current_location.address}
+                      {line.current_location.timestamp && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Last updated:{" "}
+                          {new Date(
+                            line.current_location.timestamp
+                          ).toLocaleTimeString()}
+                        </p>
+                      )}
                     </p>
                   </div>
                 </Popup>
@@ -1010,6 +1018,16 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
     </div>
   );
 };
+
+// 🛑 NEW: Dynamic import wrapper for MapContainer/BusMap
+const DynamicBusMap = dynamic(() => Promise.resolve(BusMap), {
+  ssr: false, // This is the critical setting! Prevents server-side rendering.
+  loading: () => (
+    <p className="h-[400px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+      Loading Map...
+    </p>
+  ),
+});
 
 export default function Dashboard() {
   const { operational_summary, bus_lines, company_info } = amanaData;
@@ -1033,12 +1051,12 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {/* 🛑 NEW: Interactive Map Section */}
+      {/* 🛑 MODIFIED: Using the dynamic component */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold mb-4 text-foreground">
           Live Fleet Tracking Map
         </h2>
-        <BusMap busLines={bus_lines} />
+        <DynamicBusMap busLines={bus_lines} /> {/* Use DynamicBusMap here */}
       </section>
 
       {/* Operational Summary Cards */}
