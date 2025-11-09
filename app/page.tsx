@@ -1,12 +1,18 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 "use client";
 
-import { useMemo, useState } from "react"; // We need this hook for the accordion functionality
-
-// 🛑 NEW IMPORTS for the map feature
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from "leaflet"; // Used for custom marker icons
-
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+
+// 🛑 Dynamic import of BusMap component
+const DynamicBusMap = dynamic(() => import("@/components/BusMap"), {
+  ssr: false,
+  loading: () => (
+    <p className="h-[400px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+      Loading Map...
+    </p>
+  ),
+});
 
 // --- Type Definitions ---
 type Incident = {
@@ -908,27 +914,38 @@ const BusLineRow: React.FC<{ line: BusLine }> = ({ line }) => {
   );
 };
 
-// --- NEW Component: BusMap (Bus Tracking Map) ---
+// 🛑 MODIFIED: BusMap component with client-side imports
 const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
-  // Center map near Kuala Lumpur, Malaysia (the implied location)
+  // Import Leaflet inside the component (will only run on client)
+  const L = require("leaflet");
+  const { MapContainer, TileLayer, Marker, Popup } = require("react-leaflet");
+
   const position: [number, number] = [3.139, 101.6869];
   const zoom = 11;
 
-  // Custom marker icons based on status
-  const createBusIcon = (color: string) => {
-    return new L.DivIcon({
-      className: "custom-bus-icon",
-      html: `<div style="background-color: ${color};" class="w-7 h-7 rounded-full flex items-center justify-center border-2 border-white dark:border-zinc-950 shadow-lg text-white font-bold text-xs">🚌</div>`,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-      popupAnchor: [0, -7],
-    });
-  };
+  const createBusIcon = useMemo(
+    () => (color: string) => {
+      return new L.DivIcon({
+        className: "custom-bus-icon",
+        html: `<div style="background-color: ${color};" class="w-7 h-7 rounded-full flex items-center justify-center border-2 border-white dark:border-zinc-950 shadow-lg text-white font-bold text-xs">🚌</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -7],
+      });
+    },
+    [L]
+  );
 
-  const activeIcon = useMemo(() => createBusIcon("#10b981"), []);
-  const maintenanceIcon = useMemo(() => createBusIcon("#f59e0b"), []);
-  const outOfServiceIcon = useMemo(() => createBusIcon("#ef4444"), []);
-  const unknownIcon = useMemo(() => createBusIcon("#71717a"), []);
+  const activeIcon = useMemo(() => createBusIcon("#10b981"), [createBusIcon]);
+  const maintenanceIcon = useMemo(
+    () => createBusIcon("#f59e0b"),
+    [createBusIcon]
+  );
+  const outOfServiceIcon = useMemo(
+    () => createBusIcon("#ef4444"),
+    [createBusIcon]
+  );
+  const unknownIcon = useMemo(() => createBusIcon("#71717a"), [createBusIcon]);
 
   const getBusIcon = (status: BusLine["status"]) => {
     switch (status) {
@@ -948,9 +965,7 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
   );
 
   return (
-    // Note: MapContainer needs to be imported here or from the dynamic import's component
     <div className="w-full h-[400px] rounded-lg shadow-xl overflow-hidden border border-zinc-200 dark:border-zinc-700">
-      {/* The MapContainer MUST be rendered *inside* the component that is dynamically loaded */}
       <MapContainer
         center={position}
         zoom={zoom}
@@ -968,7 +983,7 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
             line.current_location.latitude &&
             line.current_location.longitude
           ) {
-            const position: L.LatLngExpression = [
+            const position: [number, number] = [
               line.current_location.latitude,
               line.current_location.longitude,
             ];
@@ -998,15 +1013,15 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
                       <strong>Load:</strong> {line.passengers.current}/
                       {line.passengers.capacity} (
                       {line.passengers.utilization_percentage}%)
-                      {line.current_location.timestamp && (
-                        <p className="mt-1 text-xs text-zinc-500">
-                          Last updated:{" "}
-                          {new Date(
-                            line.current_location.timestamp
-                          ).toLocaleTimeString()}
-                        </p>
-                      )}
                     </p>
+                    {line.current_location.timestamp && (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Last updated:{" "}
+                        {new Date(
+                          line.current_location.timestamp
+                        ).toLocaleTimeString()}
+                      </p>
+                    )}
                   </div>
                 </Popup>
               </Marker>
@@ -1019,26 +1034,12 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
   );
 };
 
-// 🛑 NEW: Dynamic import wrapper for MapContainer/BusMap
-const DynamicBusMap = dynamic(() => Promise.resolve(BusMap), {
-  ssr: false, // This is the critical setting! Prevents server-side rendering.
-  loading: () => (
-    <p className="h-[400px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
-      Loading Map...
-    </p>
-  ),
-});
-
+// --- MODIFIED Component: Dashboard ---
 export default function Dashboard() {
   const { operational_summary, bus_lines, company_info } = amanaData;
   const criticalIncidents = bus_lines
     .flatMap((line) => line.incidents)
     .filter((i) => i.priority === "Critical" && i.status !== "Resolved").length;
-
-  // Since we are using a client-side hook (useState) in BusLineRow, we need to make the parent component a Client Component.
-  // In Next.js App Router, this is typically done by adding 'use client' at the top, but since we are modifying only page.tsx,
-  // we'll assume the Next.js setup handles this for now, or you would add 'use client' at the top of this file.
-  // For the purpose of providing the improved code block, the structure below is correct.
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950 p-4 md:p-8">
@@ -1051,12 +1052,12 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {/* 🛑 MODIFIED: Using the dynamic component */}
+      {/* 🛑 Using the dynamic component */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold mb-4 text-foreground">
           Live Fleet Tracking Map
         </h2>
-        <DynamicBusMap busLines={bus_lines} /> {/* Use DynamicBusMap here */}
+        <DynamicBusMap busLines={bus_lines} />
       </section>
 
       {/* Operational Summary Cards */}
