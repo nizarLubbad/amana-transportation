@@ -830,7 +830,10 @@ const BusLineDetails: React.FC<{ line: BusLine }> = ({ line }) => (
   </div>
 );
 
-const BusLineRow: React.FC<{ line: BusLine }> = ({ line }) => {
+const BusLineRow: React.FC<{ line: BusLine; onClick: () => void }> = ({
+  line,
+  onClick,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasHighPriorityIncident = line.incidents.some(
     (i) => ["Critical", "High"].includes(i.priority) && i.status !== "Resolved"
@@ -849,9 +852,17 @@ const BusLineRow: React.FC<{ line: BusLine }> = ({ line }) => {
                     ${
                       hasHighPriorityIncident ? "border-l-4 border-red-500" : ""
                     }`}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={(e) => {
+          // If clicking on the expand area, toggle expansion
+          // Otherwise, trigger the map selection
+          const target = e.target as HTMLElement;
+          if (target.closest(".expand-toggle")) {
+            setIsExpanded(!isExpanded);
+          } else {
+            onClick();
+          }
+        }}
       >
-        {/* ... (tds remain the same) ... */}
         <td className="px-6 py-4 whitespace-nowrap">
           <p className="text-sm font-semibold text-foreground">
             {line.route_number}
@@ -889,9 +900,13 @@ const BusLineRow: React.FC<{ line: BusLine }> = ({ line }) => {
             <span className="text-red-500 mr-2 font-bold">⚠️</span>
           )}
           <span
-            className={`inline-block transform transition-transform ${
+            className={`expand-toggle inline-block transform transition-transform ${
               isExpanded ? "rotate-90" : "rotate-0"
             }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
           >
             &gt;
           </span>
@@ -900,7 +915,6 @@ const BusLineRow: React.FC<{ line: BusLine }> = ({ line }) => {
 
       {/* Expanded Content Row */}
       {isExpanded && (
-        // Use a slightly darker gray for the expanded content row for contrast
         <tr className="bg-zinc-50 dark:bg-zinc-900/75">
           <td
             colSpan={5}
@@ -1037,6 +1051,10 @@ const BusMap: React.FC<{ busLines: BusLine[] }> = ({ busLines }) => {
 // --- MODIFIED Component: Dashboard ---
 export default function Dashboard() {
   const { operational_summary, bus_lines, company_info } = amanaData;
+
+  // 🛑 State to track selected bus
+  const [selectedBusId, setSelectedBusId] = useState<number | null>(null);
+
   const criticalIncidents = bus_lines
     .flatMap((line) => line.incidents)
     .filter((i) => i.priority === "Critical" && i.status !== "Resolved").length;
@@ -1052,12 +1070,12 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {/* 🛑 Using the dynamic component */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold mb-4 text-foreground">
           Live Fleet Tracking Map
         </h2>
-        <DynamicBusMap busLines={bus_lines} />
+        {/* 🛑 Pass selectedBusId to map */}
+        <DynamicBusMap busLines={bus_lines} selectedBusId={selectedBusId} />
       </section>
 
       {/* Operational Summary Cards */}
@@ -1084,13 +1102,12 @@ export default function Dashboard() {
             description={`Total capacity: ${operational_summary.total_capacity}`}
             icon={<span className="text-xl">🧑‍🤝‍🧑</span>}
           />
-          {/* 🛑 Key Change: Passing the percentage to the new 'progressBar' prop */}
           <Card
             title="Avg. Utilization"
             value={`${operational_summary.average_utilization}%`}
             description={`System-wide passenger load.`}
             icon={<span className="text-xl">📈</span>}
-            progressBar={operational_summary.average_utilization} // New Prop
+            progressBar={operational_summary.average_utilization}
           />
         </div>
         {criticalIncidents > 0 && (
@@ -1105,58 +1122,44 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Bus Line Status Table (Now using BusLineRow component) */}
+      {/* 🛑 KEEP THE TABLE LAYOUT */}
       <section>
         <h2 className="text-xl font-semibold mb-4 text-foreground">
-          Bus Line Status ({bus_lines.length} Routes)
+          Fleet Status Overview
         </h2>
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-md">
           <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700">
             <thead className="bg-zinc-100 dark:bg-zinc-800">
               <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
-                >
+                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                   Route
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
-                >
+                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
-                >
-                  Passengers
+                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Occupancy
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
-                >
-                  Next Stop / ETA
+                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Next Stop
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
-                >
+                <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                   Details
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-900">
+            <tbody className="bg-white dark:bg-zinc-900 divide-y divide-zinc-200 dark:divide-zinc-700">
               {bus_lines.map((line) => (
-                // Using the new component instead of a raw <tr>
-                <BusLineRow key={line.id} line={line} />
+                <BusLineRow
+                  key={line.id}
+                  line={line}
+                  onClick={() => setSelectedBusId(line.id)}
+                />
               ))}
             </tbody>
           </table>
         </div>
       </section>
-
-      {/* Removed the redundant 'Detailed Bus Information' section at the bottom */}
     </div>
   );
 }
